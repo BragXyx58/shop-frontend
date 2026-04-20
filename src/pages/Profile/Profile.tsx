@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useUserStore } from '../../store/userStore';
-import { apiAuth, apiOrders } from '../../api';
+import { apiUsers, apiOrders } from '../../api';
 
 export const Profile = () => {
   const { email, username } = useUserStore();
@@ -11,7 +11,7 @@ export const Profile = () => {
 
   useEffect(() => {
     if (email) {
-      apiAuth.get(`/profile/${email}`).then(res => {
+      apiUsers.get(`/profile/${email}`).then(res => {
         setPhone(res.data.phone || '');
         setAddress(res.data.address || '');
       });
@@ -22,7 +22,7 @@ export const Profile = () => {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await apiAuth.put(`/profile/${email}`, { phone, address });
+      await apiUsers.put(`/profile/${email}`, { phone, address });
       setMsg('✅ Дані успішно збережено!');
     } catch {
       setMsg('❌ Помилка збереження.');
