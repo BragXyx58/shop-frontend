@@ -6,6 +6,7 @@ import { useUserStore } from '../../store/userStore';
 import type { IProduct } from '../../types/product';
 
 export const AdminPanel = () => {
+  const [isNewCategory, setIsNewCategory] = useState(false);
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { role } = useUserStore();
@@ -22,6 +23,12 @@ export const AdminPanel = () => {
   const [category, setCategory] = useState('');
   const [imageUrl, setImageUrl] = useState('');
 
+  const [productSearch, setProductSearch] = useState('');
+  const [productCategoryFilter, setProductCategoryFilter] = useState('');
+  
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState('');
+
   useEffect(() => {
     if (role !== 'Admin') {
       navigate('/');
@@ -30,6 +37,8 @@ export const AdminPanel = () => {
       fetchOrders();
     }
   }, [role, navigate]);
+
+  const categories = Array.from(new Set(products.map(p => p.category)));
 
   const fetchProducts = async () => {
     try {
@@ -51,25 +60,20 @@ export const AdminPanel = () => {
 
   const handleAddOrUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    const productData = { 
-      name, 
-      description: desc, 
-      price: Number(price), 
-      category, 
-      imageUrl 
-    };
+    const productData = { name, description: desc, price: Number(price), category, imageUrl };
 
     try {
       if (editingId) {
         await apiProducts.put(`/products/${editingId}`, productData);
-        setStatusMsg('✅ Товар оновлено! ');
+        setStatusMsg('✅ Товар оновлено!');
         setEditingId(null);
       } else {
         await apiProducts.post('/products', productData);
-        setStatusMsg('✅ Товар успішно додано! ');
+        setStatusMsg('✅ Товар успішно додано!');
       }
       
       setName(''); setDesc(''); setPrice(''); setCategory(''); setImageUrl('');
+      setIsNewCategory(false);
       fetchProducts();
     } catch (error) {
       setStatusMsg('❌ Помилка при збереженні товару.');
@@ -83,6 +87,7 @@ export const AdminPanel = () => {
     setPrice(p.price.toString());
     setCategory(p.category);
     setImageUrl(p.imageUrl || '');
+    setIsNewCategory(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -107,6 +112,20 @@ export const AdminPanel = () => {
     }
   };
 
+  const filteredProducts = products.filter(p => {
+    const matchSearch = p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
+                        p.description.toLowerCase().includes(productSearch.toLowerCase());
+    const matchCategory = productCategoryFilter === '' || p.category === productCategoryFilter;
+    return matchSearch && matchCategory;
+  });
+
+  const filteredOrders = orders.filter(o => {
+    const searchString = `${o.id} ${o.userEmail} ${o.phoneNumber} ${o.deliveryAddress}`.toLowerCase();
+    const matchSearch = searchString.includes(orderSearch.toLowerCase());
+    const matchStatus = orderStatusFilter === '' || o.status === orderStatusFilter;
+    return matchSearch && matchStatus;
+  });
+
   return (
     <div className="container" style={{ maxWidth: '1000px' }}>
       <h1 style={{ color: '#f59e0b', marginBottom: '20px' }}> {t('admin_panel')}</h1>
@@ -114,8 +133,7 @@ export const AdminPanel = () => {
       {statusMsg && (
         <h3 style={{ 
           color: statusMsg.includes('❌') ? 'var(--danger)' : 'var(--success)', 
-          marginBottom: '20px',
-          padding: '10px',
+          marginBottom: '20px', padding: '10px',
           backgroundColor: statusMsg.includes('❌') ? '#fee2e2' : '#d1fae5',
           borderRadius: '8px'
         }}>
@@ -143,41 +161,64 @@ export const AdminPanel = () => {
       {activeTab === 'products' ? (
         <>
           <div className="card" style={{ marginBottom: '40px' }}>
-            <h3 style={{ marginBottom: '20px' }}>
-              {editingId ? '✏️ Редагувати товар' : `➕ ${t('admin_add_title')}`}
-            </h3>
+            <h3 style={{ marginBottom: '20px' }}>{editingId ? '✏️ Редагувати товар' : `➕ ${t('admin_add_title')}`}</h3>
             <form className="form-group" style={{ maxWidth: '100%' }} onSubmit={handleAddOrUpdateProduct}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                 <input type="text" placeholder={t('product_name')} required value={name} onChange={(e) => setName(e.target.value)} />
-                <input type="text" placeholder={t('category')} required value={category} onChange={(e) => setCategory(e.target.value)} />
+                {isNewCategory ? (
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <input type="text" placeholder="Введіть нову категорію" required value={category} onChange={(e) => setCategory(e.target.value)} style={{ flex: 1 }} />
+                    <button type="button" className="btn btn-danger" onClick={() => { setIsNewCategory(false); setCategory(''); }}>Скасувати</button>
+                  </div>
+                ) : (
+                  <select value={category} required onChange={(e) => {
+                      if (e.target.value === 'NEW') { setIsNewCategory(true); setCategory(''); } 
+                      else { setCategory(e.target.value); }
+                    }} 
+                    style={{ padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'white' }}
+                  >
+                    <option value="" disabled>Оберіть категорію</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="NEW" style={{ fontWeight: 'bold', color: 'var(--primary)' }}>➕ Додати нову категорію...</option>
+                  </select>
+                )}
                 <input type="number" placeholder={t('price')} required value={price} onChange={(e) => setPrice(e.target.value)} />
                 <input type="text" placeholder="URL картинки (http://...)" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
               </div>
               <textarea placeholder={t('description')} required value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} style={{ marginTop: '15px' }} />
               
               <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
-                <button type="submit" className="btn btn-primary">
-                  {editingId ? '💾 Зберегти зміни' : t('create_product')}
-                </button>
-                {editingId && (
-                  <button type="button" className="btn btn-danger" onClick={() => { setEditingId(null); setName(''); setDesc(''); setPrice(''); setCategory(''); setImageUrl(''); }}>
-                    Скасувати
-                  </button>
-                )}
+                <button type="submit" className="btn btn-primary">{editingId ? '💾 Зберегти зміни' : t('create_product')}</button>
+                {editingId && <button type="button" className="btn btn-danger" onClick={() => { setEditingId(null); setName(''); setDesc(''); setPrice(''); setCategory(''); setImageUrl(''); }}>Скасувати</button>}
               </div>
             </form>
           </div>
 
-          <h3 style={{ marginBottom: '15px' }}>📦 {t('admin_manage_title')}</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+            <h3>📦 {t('admin_manage_title')}</h3>
+          </div>
+
+          <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+            <input 
+              type="text" placeholder="Пошук товарів за назвою..." 
+              value={productSearch} onChange={(e) => setProductSearch(e.target.value)} 
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+            />
+            <select 
+              value={productCategoryFilter} onChange={(e) => setProductCategoryFilter(e.target.value)}
+              style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'white', minWidth: '200px' }}
+            >
+              <option value="">Всі категорії</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
           <div className="card" style={{ padding: '0' }}>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {products.length === 0 ? <li style={{ padding: '20px' }}>Товарів немає</li> : products.map((p, index) => (
+              {filteredProducts.length === 0 ? <li style={{ padding: '20px', color: 'var(--text-muted)' }}>Нічого не знайдено</li> : filteredProducts.map((p, index) => (
                 <li key={p.id} style={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  padding: '15px 20px', 
-                  borderBottom: index !== products.length - 1 ? '1px solid var(--border-color)' : 'none', 
-                  alignItems: 'center' 
+                  display: 'flex', justifyContent: 'space-between', padding: '15px 20px', 
+                  borderBottom: index !== filteredProducts.length - 1 ? '1px solid var(--border-color)' : 'none', alignItems: 'center' 
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                     {p.imageUrl ? (
@@ -197,44 +238,59 @@ export const AdminPanel = () => {
           </div>
         </>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          {orders.length === 0 ? <p>Замовлень немає.</p> : orders.map(o => (
-            <div key={o.id} className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <h3>Замовлення #{o.id}</h3>
-                <h2 style={{ color: 'var(--primary)' }}>{o.totalAmount} ₴</h2>
+        <>
+          <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
+            <input 
+              type="text" placeholder="Пошук за ID, Email, адресою або телефоном..." 
+              value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} 
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}
+            />
+            <select 
+              value={orderStatusFilter} onChange={(e) => setOrderStatusFilter(e.target.value)}
+              style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'white', minWidth: '200px' }}
+            >
+              <option value="">Всі статуси</option>
+              <option value="Pending">Очікує (Pending)</option>
+              <option value="Paid">Оплачено (Paid)</option>
+              <option value="Shipped">Відправлено (Shipped)</option>
+              <option value="Cancelled">Скасовано (Cancelled)</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {filteredOrders.length === 0 ? <p style={{ color: 'var(--text-muted)' }}>Замовлень не знайдено.</p> : filteredOrders.map(o => (
+              <div key={o.id} className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <h3>Замовлення #{o.id}</h3>
+                  <h2 style={{ color: 'var(--primary)' }}>{o.totalAmount} ₴</h2>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', color: 'var(--text-muted)', marginBottom: '15px' }}>
+                  <p><strong>Клієнт:</strong> {o.userEmail}</p>
+                  <p><strong>Телефон:</strong> {o.phoneNumber}</p>
+                  <p><strong>Адреса:</strong> {o.deliveryAddress}</p>
+                  <p><strong>Створено:</strong> {new Date(o.createdAt).toLocaleString()}</p>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                  <strong style={{ color: 'var(--text-main)' }}>Статус:</strong>
+                  <select 
+                    value={o.status} 
+                    onChange={(e) => handleChangeOrderStatus(o.id, e.target.value)}
+                    style={{ 
+                      padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', 
+                      fontSize: '15px', fontWeight: 'bold', backgroundColor: 'white', cursor: 'pointer'
+                    }}
+                  >
+                    <option value="Pending">Очікує (Pending)</option>
+                    <option value="Paid">Оплачено (Paid)</option>
+                    <option value="Shipped">Відправлено (Shipped)</option>
+                    <option value="Cancelled">Скасовано (Cancelled)</option>
+                  </select>
+                </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', color: 'var(--text-muted)', marginBottom: '15px' }}>
-                <p><strong>Клієнт:</strong> {o.userEmail}</p>
-                <p><strong>Телефон:</strong> {o.phoneNumber}</p>
-                <p><strong>Адреса:</strong> {o.deliveryAddress}</p>
-                <p><strong>Створено:</strong> {new Date(o.createdAt).toLocaleString()}</p>
-              </div>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-                <strong style={{ color: 'var(--text-main)' }}>Статус:</strong>
-                <select 
-                  value={o.status} 
-                  onChange={(e) => handleChangeOrderStatus(o.id, e.target.value)}
-                  style={{ 
-                    padding: '8px 12px', 
-                    borderRadius: '6px', 
-                    border: '1px solid var(--border-color)', 
-                    fontSize: '15px', 
-                    fontWeight: 'bold',
-                    backgroundColor: 'white',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="Pending">Очікує (Pending)</option>
-                  <option value="Paid">Оплачено (Paid)</option>
-                  <option value="Shipped">Відправлено (Shipped)</option>
-                  <option value="Cancelled">Скасовано (Cancelled)</option>
-                </select>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

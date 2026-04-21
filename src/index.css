@@ -80,7 +80,11 @@ body {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
-.card h3 { font-size: 1.25rem; margin-bottom: 5px; }
+.card h3 { 
+  font-size: 1.25rem; 
+  margin-bottom: 5px; 
+  word-break: break-word; 
+}
 .card .category { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 10px; }
 .card .price { color: var(--primary); font-size: 1.5rem; font-weight: bold; margin: 15px 0; }
 .card .spacer { flex-grow: 1; }
@@ -108,16 +112,20 @@ body {
   margin: 0 auto;
 }
 
-input, textarea {
+input, textarea, select {
   padding: 12px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   font-size: 1rem;
   outline: none;
   transition: border-color 0.2s;
+  background-color: white; 
+  font-family: inherit;
 }
 
-input:focus, textarea:focus { border-color: var(--primary); }
+input:focus, textarea:focus, select:focus { 
+  border-color: var(--primary); 
+}
 
 .card-image {
   width: 100%;
